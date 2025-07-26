@@ -1,0 +1,315 @@
+<!DOCTYPE html><html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tic Tac Toe - Full Game</title>
+  <style>
+    :root {
+      --bg-dark: linear-gradient(to right, #0f2027, #203a43, #2c5364);
+      --bg-light: linear-gradient(to right, #ffffff, #f0f0f0);
+      --cell-dark: #333;
+      --cell-light: #ddd;
+      --x-color: #00BFFF;
+      --o-color: #FF69B4;
+      --win-color: yellow;
+      --font: 'Segoe UI', sans-serif;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: var(--font);
+      background: var(--bg-dark);
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+    #startScreen {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: url('https://images.unsplash.com/photo-1525186402429-b4ff38bedf09?fit=crop&w=1950&q=80') center/cover no-repeat;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 5;
+    }
+    #startScreen h1 {
+      font-size: 3em;
+      color: white;
+      text-shadow: 2px 2px 8px black;
+    }
+    #startScreen button {
+      padding: 15px 30px;
+      font-size: 1.2em;
+      margin-top: 20px;
+      background-color: #00c851;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      color: white;
+      transition: background 0.3s;
+    }
+    #startScreen button:hover {
+      background-color: #007e33;
+    }
+    #game {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+    }
+    .board {
+      display: grid;
+      grid-template-columns: repeat(3, 100px);
+      gap: 10px;
+      margin: 20px;
+    }
+    .cell {
+      width: 100px;
+      height: 100px;
+      font-size: 2em;
+      background-color: var(--cell-dark);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    .cell.win {
+      background-color: var(--win-color) !important;
+      animation: flash 1s infinite alternate;
+    }
+    @keyframes flash {
+      from { background-color: yellow; }
+      to { background-color: orange; }
+    }
+    .controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .scoreboard {
+      margin-top: 10px;
+      font-size: 1em;
+    }
+    .theme-select, .difficulty-select {
+      margin: 10px;
+    }
+    .reset-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 1.5em;
+      color: white;
+    }
+    @media (max-width: 600px) {
+      .board {
+        grid-template-columns: repeat(3, 80px);
+        gap: 8px;
+      }
+      .cell {
+        width: 80px;
+        height: 80px;
+        font-size: 1.5em;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="startScreen">
+    <h1>Tic Tac Toe</h1>
+    <button onclick="startGame()">Start Game</button>
+  </div> <div id="game">
+    <div class="controls">
+      <select id="theme" class="theme-select" onchange="switchTheme(this.value)">
+        <option value="dark">Dark</option>
+        <option value="light">Light</option>
+      </select>
+      <select id="difficulty" class="difficulty-select">
+        <option value="easy">Easy</option>
+        <option value="hard">Hard</option>
+      </select>
+      <button class="reset-btn" onclick="resetScore()">🔄</button>
+    </div>
+    <div class="board" id="board"></div>
+    <div id="message"></div>
+    <div class="scoreboard" id="scoreboard">
+      X: <span id="xScore">0</span> | O: <span id="oScore">0</span> | Draws: <span id="draws">0</span>
+    </div>
+  </div><audio id="moveSound" src="https://www.soundjay.com/button/beep-07.wav"></audio> <audio id="winSound" src="https://www.soundjay.com/button/beep-08b.wav"></audio> <audio id="bgMusic" src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" loop autoplay></audio>
+
+  <script>
+    const board = document.getElementById('board');
+    const moveSound = document.getElementById('moveSound');
+    const winSound = document.getElementById('winSound');
+    const bgMusic = document.getElementById('bgMusic');
+    const message = document.getElementById('message');
+    const xScore = document.getElementById('xScore');
+    const oScore = document.getElementById('oScore');
+    const draws = document.getElementById('draws');
+    const theme = document.getElementById('theme');
+
+    let cells = [];
+    let currentPlayer = 'X';
+    let gameActive = true;
+    let score = { X: 0, O: 0, draw: 0 };
+
+    const winPatterns = [
+      [0,1,2], [3,4,5], [6,7,8],
+      [0,3,6], [1,4,7], [2,5,8],
+      [0,4,8], [2,4,6]
+    ];
+
+    function startGame() {
+      document.getElementById('startScreen').style.display = 'none';
+      document.getElementById('game').style.display = 'flex';
+      switchTheme(localStorage.getItem('theme') || 'dark');
+      drawBoard();
+    }
+
+    function drawBoard() {
+      board.innerHTML = '';
+      cells = [];
+      for (let i = 0; i < 9; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.addEventListener('click', () => makeMove(i));
+        board.appendChild(cell);
+        cells.push(cell);
+      }
+    }
+
+    function makeMove(index) {
+      if (!gameActive || cells[index].textContent) return;
+      cells[index].textContent = currentPlayer;
+      moveSound.play();
+      if (checkWin(currentPlayer)) {
+        gameActive = false;
+        winSound.play();
+        message.textContent = `${currentPlayer} wins!`;
+        score[currentPlayer]++;
+        updateScore();
+        highlightWin(currentPlayer);
+        setTimeout(resetBoard, 2000);
+        return;
+      }
+      if (cells.every(c => c.textContent)) {
+        gameActive = false;
+        message.textContent = 'Draw!';
+        score.draw++;
+        updateScore();
+        setTimeout(resetBoard, 2000);
+        return;
+      }
+      currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+      if (currentPlayer === 'O') setTimeout(makeAIMove, 500);
+    }
+
+    function makeAIMove() {
+      const difficulty = document.getElementById('difficulty').value;
+      let index;
+      if (difficulty === 'easy') {
+        const empty = cells.map((c, i) => c.textContent ? null : i).filter(i => i !== null);
+        index = empty[Math.floor(Math.random() * empty.length)];
+      } else {
+        index = findBestMove();
+      }
+      makeMove(index);
+    }
+
+    function checkWin(player) {
+      return winPatterns.some(pattern => pattern.every(i => cells[i].textContent === player));
+    }
+
+    function highlightWin(player) {
+      winPatterns.forEach(pattern => {
+        if (pattern.every(i => cells[i].textContent === player)) {
+          pattern.forEach(i => cells[i].classList.add('win'));
+        }
+      });
+    }
+
+    function updateScore() {
+      xScore.textContent = score.X;
+      oScore.textContent = score.O;
+      draws.textContent = score.draw;
+    }
+
+    function resetBoard() {
+      currentPlayer = 'X';
+      message.textContent = '';
+      gameActive = true;
+      drawBoard();
+    }
+
+    function switchTheme(mode) {
+      localStorage.setItem('theme', mode);
+      if (mode === 'light') {
+        document.body.style.background = 'var(--bg-light)';
+        document.querySelectorAll('.cell').forEach(c => c.style.background = 'var(--cell-light)');
+        document.body.style.color = '#333';
+      } else {
+        document.body.style.background = 'var(--bg-dark)';
+        document.querySelectorAll('.cell').forEach(c => c.style.background = 'var(--cell-dark)');
+        document.body.style.color = 'white';
+      }
+    }
+
+    function resetScore() {
+      score = { X: 0, O: 0, draw: 0 };
+      updateScore();
+    }
+
+    function findBestMove() {
+      let bestScore = -Infinity;
+      let move;
+      for (let i = 0; i < 9; i++) {
+        if (!cells[i].textContent) {
+          cells[i].textContent = 'O';
+          let score = minimax(cells, 0, false);
+          cells[i].textContent = '';
+          if (score > bestScore) {
+            bestScore = score;
+            move = i;
+          }
+        }
+      }
+      return move;
+    }
+
+    function minimax(boardState, depth, isMaximizing) {
+      if (checkWin('O')) return 1;
+      if (checkWin('X')) return -1;
+      if (cells.every(c => c.textContent)) return 0;
+
+      if (isMaximizing) {
+        let best = -Infinity;
+        for (let i = 0; i < 9; i++) {
+          if (!cells[i].textContent) {
+            cells[i].textContent = 'O';
+            best = Math.max(best, minimax(cells, depth + 1, false));
+            cells[i].textContent = '';
+          }
+        }
+        return best;
+      } else {
+        let best = Infinity;
+        for (let i = 0; i < 9; i++) {
+          if (!cells[i].textContent) {
+            cells[i].textContent = 'X';
+            best = Math.min(best, minimax(cells, depth + 1, true));
+            cells[i].textContent = '';
+          }
+        }
+        return best;
+      }
+    }
+  </script></body>
+</html>  
